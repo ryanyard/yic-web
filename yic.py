@@ -37,7 +37,6 @@ log_file = "/var/log/yic/yic.log"
 log_format = '%(asctime)s - %(name)s:%(levelname)s:%(message)s'
 logging.basicConfig(format=log_format, filename=log_file, level=logging.DEBUG) 
 
-
 def yumInstall(pkgname):
   ybc = cli.YumBaseCli()
   ybc.doConfigSetup()
