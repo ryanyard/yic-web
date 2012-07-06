@@ -13,22 +13,23 @@
 # written by Ed Brand
 #            Ryan Yard <ryard@redhat.com>
 
-from urllib2 import urlopen, quote
-from BeautifulSoup import BeautifulSoup
+
 from subprocess import call
 from optparse import OptionParser
-import os, sys, time, logging, inspect
+import os, sys, time, logging, inspect, json
 import yic_snapshot, yic_fastmirror
-import sys
 sys.path.append("/usr/share/yum-cli")
 import cli, yum
- 
+from restful_lib import Connection
+
+url = ""
+results = ""
+datafile = {}
 path = "/path/"
 build = "build"
 tmp_path = "/tmp/yic"
 script_prefix = "/scripts/"
 datafile_prefix = "/datafiles/"
-datafile = {}
 snapshot_file = "/.snapshot"
 mirrorlist = ["http://localhost/", "http://localhost/"]
 #mirrorlist = ["http://mirror.overthewire.com.au/pub/epel/", "http://epel.mirrors.arminco.com/", "http://mirror.iprimus.com.au/epel/"]
@@ -62,7 +63,6 @@ def cleanup():
 def getFastestMirror():
   global url
   url = yic_fastmirror.FastestMirror(mirrorlist).get_mirrorlist()[0]
-  #print "Result: " + url
   return url
 
 def funcname():
@@ -127,6 +127,18 @@ def processDataFile(prefix, file):
   except(), e:
      logging.debug('%s: Failure', funcname())
  
+def getRest(file):
+  global results
+  url = "http://localhost:8080/documents/"
+  conn = Connection(url)
+  resp = conn.request_get(file, args={}, headers={'content-type':'application/json', 'accept':'application/json'})
+  results = json.loads(resp[u'body'])
+  return results
+
+def printRest(file):
+   getRest(file)
+   print results['DESCRIPTION']
+
 def install():
   processPreScripts(script_prefix)
   installRPMs()
@@ -216,30 +228,31 @@ def removeRPMs():
       logging.debug('%s: Failure', funcname())
  
 def main():
-  usage = "usage: %prog [options] filename"
-  parser = OptionParser(usage=usage)
-  parser.add_option("-f", "--file", type="string", dest="filename",
-                    help="datafile name", metavar="FILE")
-  parser.add_option("-l", "--list", action="callback", callback=listFile,
-                    help="list files")
-  parser.add_option("-g", "--get", type="string", dest="filename",
-                    help="get files", metavar="FILE",
-                    action="callback", callback=getFile)
-  parser.add_option("-v", "--verbose",
-                    action="store_true", dest="verbose")
-  parser.add_option("-q", "--quiet",
-                    action="store_false", dest="verbose")
+  #usage = "usage: %prog [options] filename"
+  #parser = OptionParser(usage=usage)
+  #parser.add_option("-f", "--file", type="string", dest="filename",
+  #                  help="datafile name", metavar="FILE")
+  #parser.add_option("-l", "--list", action="callback", callback=listFile,
+  #                  help="list files")
+  #parser.add_option("-g", "--get", type="string", dest="filename",
+  #                  help="get files", metavar="FILE",
+  #                  action="callback", callback=getFile)
+  #parser.add_option("-v", "--verbose",
+  #                  action="store_true", dest="verbose")
+  #parser.add_option("-q", "--quiet",
+  #                  action="store_false", dest="verbose")
 
-  try:
-    (options, args) = parser.parse_args()
-    if options.filename is None:
-      parser.print_help()
-      exit(-1)
-    snapShot()
-    processDataFiles(script_prefix, sys.argv[2])
-  except(), e:
-    print "Error: %s" %e
-    sys.exit(1)
+  #try:
+  #  (options, args) = parser.parse_args()
+  #  if options.filename is None:
+  #    parser.print_help()
+  #    exit(-1)
+  #  snapShot()
+  #  processDataFiles(script_prefix, sys.argv[2])
+  #except(), e:
+  #  print "Error: %s" %e
+  #  sys.exit(1)
+  printRest(sys.argv[1])
  
 if __name__ == '__main__':
     main()
