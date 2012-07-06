@@ -5,7 +5,8 @@ def getGridFile():
   db = Connection().mydatabase
   fs = GridFS(db)
   version = fs.get_last_version(filename="IDMAPD_post.sh")
-  print version.read()
+  with open("./IDMAPD_post.sh", "w") as lfile:
+    lfile.write(version.read())
 
 def main():
   getGridFile()

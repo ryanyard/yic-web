@@ -20,7 +20,9 @@ import os, sys, time, logging, inspect, json
 import yic_snapshot, yic_fastmirror
 sys.path.append("/usr/share/yum-cli")
 import cli, yum
-from restful_lib import Connection
+import restful_lib
+import pymongo
+from gridfs import GridFS
 
 url = ""
 results = ""
@@ -130,14 +132,22 @@ def processDataFile(prefix, file):
 def getRest(file):
   global results
   url = "http://localhost:8080/documents/"
-  conn = Connection(url)
+  conn = restful_lib.Connection(url)
   resp = conn.request_get(file, args={}, headers={'content-type':'application/json', 'accept':'application/json'})
   results = json.loads(resp[u'body'])
   return results
 
+def getGridFile(file):
+  getRest(file)
+  db = pymongo.Connection().mydatabase
+  fs = GridFS(db)
+  version = fs.get_last_version(results['POST_INSTALL_SCRIPTS'])
+  with open(results['POST_INSTALL_SCRIPTS'], "w") as lfile:
+    lfile.write(version.read())
+
 def printRest(file):
-   getRest(file)
-   print results['DESCRIPTION']
+  getRest(file)
+  print results['POST_INSTALL_SCRIPTS']
 
 def install():
   processPreScripts(script_prefix)
@@ -253,6 +263,7 @@ def main():
   #  print "Error: %s" %e
   #  sys.exit(1)
   printRest(sys.argv[1])
+  getGridFile(sys.argv[1])
  
 if __name__ == '__main__':
     main()
