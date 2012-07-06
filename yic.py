@@ -20,12 +20,10 @@ import os, sys, time, logging, inspect, json
 import yic_snapshot, yic_fastmirror
 sys.path.append("/usr/share/yum-cli")
 import cli, yum
-import restful_lib
-import pymongo
+import restful_lib, pymongo
 from gridfs import GridFS
 
 url = ""
-results = ""
 datafile = {}
 path = "/path/"
 build = "build"
@@ -33,8 +31,12 @@ tmp_path = "/tmp/yic"
 script_prefix = "/scripts/"
 datafile_prefix = "/datafiles/"
 snapshot_file = "/.snapshot"
+
 mirrorlist = ["http://localhost/", "http://localhost/"]
 #mirrorlist = ["http://mirror.overthewire.com.au/pub/epel/", "http://epel.mirrors.arminco.com/", "http://mirror.iprimus.com.au/epel/"]
+
+db = pymongo.Connection().mydatabase
+fs = GridFS(db)
 
 log_file = "/var/log/yic/yic.log"
 log_format = '%(asctime)s - %(name)s:%(levelname)s:%(message)s'
@@ -84,70 +86,29 @@ def snapShot():
     return 
   else:
     logit(funcname(), "No Snapshot")
-
-def listFile(option, opt_str, value, parser):
-  getFastestMirror()
-  page = urlopen(url + path + build + datafile_prefix)
-  soup = BeautifulSoup(page)
-  try:
-    for item in soup.findAll('a', href=True):
-      this_href = item["href"]
-      if this_href.endswith(".rc"):
-        remote_file = quote(this_href, safe=":/")
-        print remote_file
-  except(), e:
-    logging.debug('%s: Unable to find valid yum baserepo URLs', funcname())
  
-def getFile(prefix, file):
-  try:
-    getFastestMirror()
-    page = urlopen(url + path + build + prefix)
-    soup = BeautifulSoup(page)
-    if not os.path.exists(tmp_path + prefix):
-      os.makedirs(tmp_path + prefix)
-      for item in soup.findAll('a', href=True):
-        this_href = item["href"]
-        if this_href.endswith(file):
-          local_file = this_href.split("/")[-1]
-          remote_file = quote(this_href, safe=":/")
-          rfile = urlopen(url + path + build + prefix + remote_file)
-          with open(tmp_path + prefix + local_file, "w") as lfile:
-            lfile.write(rfile.read())
-  except(), e:
-    logging.debug('%s: Unable to find valid yum baserepo URLs', funcname())
- 
-def processDataFile(prefix, file):
+def processDataFile(file):
   logit(funcname(), file)
   try:
-    with open(tmp_path + datafile_prefix + file) as rcfile:
-      for line in rcfile:
-        (key, val) = line.strip().replace('"','').split('=', 2)
-        datafile[(key)] = val
-    rcfile.close
     install()
     #uninstall()
   except(), e:
      logging.debug('%s: Failure', funcname())
  
-def getRest(file):
-  global results
-  url = "http://localhost:8080/documents/"
+def parseDataFile(file):
+  global datafile
+  url = "http://localhost/documents/"
   conn = restful_lib.Connection(url)
   resp = conn.request_get(file, args={}, headers={'content-type':'application/json', 'accept':'application/json'})
-  results = json.loads(resp[u'body'])
-  return results
+  datafile = json.loads(resp[u'body'])
+  return datafile
 
 def getGridFile(file):
-  getRest(file)
-  db = pymongo.Connection().mydatabase
-  fs = GridFS(db)
-  version = fs.get_last_version(results['POST_INSTALL_SCRIPTS'])
-  with open(results['POST_INSTALL_SCRIPTS'], "w") as lfile:
-    lfile.write(version.read())
-
-def printRest(file):
-  getRest(file)
-  print results['POST_INSTALL_SCRIPTS']
+  gridfile = fs.get_last_version(file)
+  if not os.path.exists(tmp_path + script_prefix):
+    os.makedirs(tmp_path + script_prefix)
+  with open(tmp_path + script_prefix + file, "w") as lfile:
+    lfile.write(gridfile.read())
 
 def install():
   processPreScripts(script_prefix)
@@ -159,55 +120,47 @@ def uninstall():
   removeRPMs()
   processPostUnScripts(script_prefix)
 
-def processDataFiles(prefix, file):
+def processDataFiles(file):
   try:
-    getFile (datafile_prefix, file)
-    processDataFile(prefix, file)
-    if datafile['DATAFILES'].endswith(".rc"):
+    parseDataFile(file)
+    processDataFile(file)
+    if datafile['DATAFILES']:
       for rc in datafile['DATAFILES'].split(' '):
-        getFile (datafile_prefix, rc)
-        processDataFile(prefix, rc)
+        parseDataFile(rc)
+        processDataFile(rc)
         logit(funcname(), file)
   except(), e:
-    logging.debug('%s: Unable to find valid yum baserepo URLs', funcname())
+    logging.debug('%s: unable to process', funcname())
  
 def processPreScripts(prefix):
   if datafile['PRE_INSTALL_SCRIPTS'].endswith(".sh"):
     for sh in datafile['PRE_INSTALL_SCRIPTS'].split(' '):
-      getFile(prefix, sh)
-      preInstallScript(sh)
+      getGridFile(sh)
+      runScript(sh)
       logit(funcname(), sh)
     
 def processPreUnScripts(prefix):
   if datafile['PRE_UNINSTALL_SCRIPTS'].endswith(".sh"):
     for sh in datafile['PRE_UNINSTALL_SCRIPTS'].split(' '):
-      getFile(prefix, sh)
+      getGridFile(sh)
+      runScript(sh)
       logit(funcname(), sh)
  
 def processPostScripts(prefix):
   if datafile['POST_INSTALL_SCRIPTS'].endswith(".sh"):
     for sh in datafile['POST_INSTALL_SCRIPTS'].split(' '):
-      getFile(prefix, sh)
-      postInstallScript(sh)
+      getGridFile(sh)
+      runScript(sh)
       logit(funcname(), sh)
  
 def processPostUnScripts(prefix):
   if datafile['POST_UNINSTALL_SCRIPTS'].endswith(".sh"):
     for sh in datafile['POST_UNINSTALL_SCRIPTS'].split(' '):
       getFile(prefix, sh)
+      runScript(sh)
       logit(funcname(), sh)
  
-def preInstallScript(file):
-  script = tmp_path + script_prefix + file
-  chmod = "/usr/bin/sudo /bin/chmod 755 " + script
-  sudo_script = "/usr/bin/sudo " + script
-  try:
-    call(chmod, shell=True)
-    call(sudo_script, shell=True)
-  except(), e:
-    logging.debug('%s: Failure', funcname())
- 
-def postInstallScript(file):
+def runScript(file):
   script = tmp_path + script_prefix + file
   chmod = "/usr/bin/sudo /bin/chmod 755 " + script
   sudo_script = "/usr/bin/sudo " + script
@@ -238,32 +191,25 @@ def removeRPMs():
       logging.debug('%s: Failure', funcname())
  
 def main():
-  #usage = "usage: %prog [options] filename"
-  #parser = OptionParser(usage=usage)
-  #parser.add_option("-f", "--file", type="string", dest="filename",
-  #                  help="datafile name", metavar="FILE")
-  #parser.add_option("-l", "--list", action="callback", callback=listFile,
-  #                  help="list files")
-  #parser.add_option("-g", "--get", type="string", dest="filename",
-  #                  help="get files", metavar="FILE",
-  #                  action="callback", callback=getFile)
-  #parser.add_option("-v", "--verbose",
-  #                  action="store_true", dest="verbose")
-  #parser.add_option("-q", "--quiet",
-  #                  action="store_false", dest="verbose")
+  usage = "usage: %prog [options] filename"
+  parser = OptionParser(usage=usage)
+  parser.add_option("-f", "--file", type="string", dest="filename",
+                    help="datafile name", metavar="FILE")
+  parser.add_option("-v", "--verbose",
+                    action="store_true", dest="verbose")
+  parser.add_option("-q", "--quiet",
+                    action="store_false", dest="verbose")
 
-  #try:
-  #  (options, args) = parser.parse_args()
-  #  if options.filename is None:
-  #    parser.print_help()
-  #    exit(-1)
-  #  snapShot()
-  #  processDataFiles(script_prefix, sys.argv[2])
-  #except(), e:
-  #  print "Error: %s" %e
-  #  sys.exit(1)
-  printRest(sys.argv[1])
-  getGridFile(sys.argv[1])
+  try:
+    (options, args) = parser.parse_args()
+    if options.filename is None:
+      parser.print_help()
+      exit(-1)
+    snapShot()
+    processDataFiles(sys.argv[2])
+  except(), e:
+    print "Error: %s" %e
+    sys.exit(1)
  
 if __name__ == '__main__':
     main()
