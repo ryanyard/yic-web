@@ -13,13 +13,12 @@
 # written by Ed Brand
 #            Ryan Yard <ryard@redhat.com>
 
-
-from subprocess import call
-from optparse import OptionParser
 import os, sys, time, logging, inspect, json
-import yic_snapshot, yic_fastmirror
 sys.path.append("/usr/share/yum-cli")
 import cli, yum
+import yic_snapshot, yic_fastmirror
+from subprocess import call
+from optparse import OptionParser
 import restful_lib, pymongo
 from gridfs import GridFS
 
@@ -41,24 +40,6 @@ fs = GridFS(db)
 log_file = "/var/log/yic/yic.log"
 log_format = '%(asctime)s - %(name)s:%(levelname)s:%(message)s'
 logging.basicConfig(format=log_format, filename=log_file, level=logging.DEBUG) 
-
-def yumInstall(pkgname):
-  ybc = cli.YumBaseCli()
-  ybc.doConfigSetup()
-  ybc.doTsSetup()
-  ybc.doRpmDBSetup()
-  ybc.installPkgs(pkgname)
-  ybc.buildTransaction()
-  ybc.doTransaction()
-
-def yumRemove(pkgname):
-  ybc = cli.YumBaseCli()
-  ybc.doConfigSetup()
-  ybc.doTsSetup()
-  ybc.doRpmDBSetup()
-  ybc.removePkgs(pkgname)
-  ybc.buildTransaction()
-  ybc.doTransaction()
 
 def cleanup():
   # need to work on this
@@ -169,6 +150,24 @@ def runScript(file):
     call(sudo_script, shell=True)
   except(), e:
     logging.debug('%s: Failure', funcname()) 
+
+def yumInstall(pkgname):
+  ybc = cli.YumBaseCli()
+  ybc.doConfigSetup()
+  ybc.doTsSetup()
+  ybc.doRpmDBSetup()
+  ybc.installPkgs(pkgname)
+  ybc.buildTransaction()
+  ybc.doTransaction()
+
+def yumRemove(pkgname):
+  ybc = cli.YumBaseCli()
+  ybc.doConfigSetup()
+  ybc.doTsSetup()
+  ybc.doRpmDBSetup()
+  ybc.removePkgs(pkgname)
+  ybc.buildTransaction()
+  ybc.doTransaction()
 
 def installRPMs():
   pkglist = []
