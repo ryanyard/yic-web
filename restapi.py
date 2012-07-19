@@ -26,4 +26,44 @@ def get_document(id):
 		abort(404, 'No document with id %s' % id)
 	return entity
 
+@route('/documents/:id/datafiles', method='GET')
+def get_document(id):
+        entity = db['documents'].find_one({'_id':id})
+        datafiles = entity['DATAFILES'].split(' ')
+        if not entity:
+                abort(404, 'No document with id %s' % id)
+        return datafiles
+
+@route('/documents/:id/prescripts', method='GET')
+def get_document(id):
+        entity = db['documents'].find_one({'_id':id})
+	processPreScripts = entity['PRE_INSTALL_SCRIPTS'].split(' ')
+        if not entity:
+                abort(404, 'No document with id %s' % id)
+        return processPreScripts
+
+@route('/documents/:id/postscripts', method='GET')
+def get_document(id):
+        entity = db['documents'].find_one({'_id':id})
+	processPostScripts = entity['POST_INSTALL_SCRIPTS'].split(' ')
+        if not entity:
+                abort(404, 'No document with id %s' % id)
+        return processPostScripts
+
+@route('/documents/:id/preunscripts', method='GET')
+def get_document(id):
+        entity = db['documents'].find_one({'_id':id})
+        processPreUnScripts = entity['PRE_UNINSTALL_SCRIPTS'].split(' ')
+        if not entity:
+                abort(404, 'No document with id %s' % id)
+        return processPreUnScripts
+
+@route('/documents/:id/postunscripts', method='GET')
+def get_document(id):
+        entity = db['documents'].find_one({'_id':id})
+        processPostUnScripts = entity['POST_UNINSTALL_SCRIPTS'].split(' ')
+        if not entity:
+                abort(404, 'No document with id %s' % id)
+        return processPostUnScripts
+
 run(host='0.0.0.0', port=8080)
