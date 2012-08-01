@@ -84,12 +84,16 @@ def parseDataFile(file):
   datafile = json.loads(resp[u'body'])
   return datafile
 
-def getGridFile(file):
+def getGridFile(file, output):
   gridfile = fs.get_last_version(file)
   if not os.path.exists(tmp_path + script_prefix):
     os.makedirs(tmp_path + script_prefix)
-  with open(tmp_path + script_prefix + file, "w") as lfile:
-    lfile.write(gridfile.read())
+  if output == 0:
+    with open(tmp_path + script_prefix + file, "w") as lfile:
+      lfile.write(gridfile.read())
+  else:
+    with open(output, "w") as lfile:
+      lfile.write(gridfile.read())
 
 def install():
   processPreScripts(script_prefix)
@@ -116,38 +120,37 @@ def processDataFiles(file):
 def processPreScripts(prefix):
   if datafile['PRE_INSTALL_SCRIPTS'].endswith(".sh"):
     for sh in datafile['PRE_INSTALL_SCRIPTS'].split(' '):
-      getGridFile(sh)
+      getGridFile(sh, 0)
       runScript(sh)
       logit(funcname(), sh)
     
 def processPreUnScripts(prefix):
   if datafile['PRE_UNINSTALL_SCRIPTS'].endswith(".sh"):
     for sh in datafile['PRE_UNINSTALL_SCRIPTS'].split(' '):
-      getGridFile(sh)
+      getGridFile(sh, 0)
       runScript(sh)
       logit(funcname(), sh)
  
 def processPostScripts(prefix):
   if datafile['POST_INSTALL_SCRIPTS'].endswith(".sh"):
     for sh in datafile['POST_INSTALL_SCRIPTS'].split(' '):
-      getGridFile(sh)
+      getGridFile(sh, 0)
       runScript(sh)
       logit(funcname(), sh)
  
 def processPostUnScripts(prefix):
   if datafile['POST_UNINSTALL_SCRIPTS'].endswith(".sh"):
     for sh in datafile['POST_UNINSTALL_SCRIPTS'].split(' '):
-      getFile(prefix, sh)
+      getGridFile(sh, 0)
       runScript(sh)
       logit(funcname(), sh)
  
 def runScript(file):
   script = tmp_path + script_prefix + file
-  chmod = "/usr/bin/sudo /bin/chmod 755 " + script
-  sudo_script = "/usr/bin/sudo " + script
+  chmod = "/bin/chmod 755 " + script
   try:
     call(chmod, shell=True)
-    call(sudo_script, shell=True)
+    call(script, shell=True)
   except(), e:
     logging.debug('%s: Failure', funcname()) 
 
@@ -194,6 +197,10 @@ def main():
   parser = OptionParser(usage=usage)
   parser.add_option("-f", "--file", type="string", dest="filename",
                     help="datafile name", metavar="FILE")
+  parser.add_option("-g", "--get", type="string", dest="gridfile",
+                    help="get files", metavar="FILE")
+  parser.add_option("-o", "--out", type="string", dest="outfile",
+                    help="output dest", metavar="DEST")
   parser.add_option("-v", "--verbose",
                     action="store_true", dest="verbose")
   parser.add_option("-q", "--quiet",
@@ -201,6 +208,9 @@ def main():
 
   try:
     (options, args) = parser.parse_args()
+    if options.gridfile:
+      getGridFile(sys.argv[2], sys.argv[4])
+      exit(0)
     if options.filename is None:
       parser.print_help()
       exit(-1)
