@@ -16,7 +16,7 @@
 import os, sys, time, logging, inspect, json
 sys.path.append("/usr/share/yum-cli")
 import cli, yum
-import yic_snapshot, yic_fastmirror
+import snapshot, fastmirror
 from subprocess import call
 from optparse import OptionParser
 import restful_lib, pymongo
@@ -47,7 +47,7 @@ def cleanup():
 
 def getFastestMirror():
   global url
-  url = yic_fastmirror.FastestMirror(mirrorlist).get_mirrorlist()[0]
+  url = fastmirror.FastestMirror(mirrorlist).get_mirrorlist()[0]
   return url
 
 def funcname():
@@ -61,9 +61,9 @@ def logit(function, log):
 def snapShot():
   if os.path.exists(snapshot_file):
     snapshot_tag = "yic_" + time.strftime("%Y%m%d%H%M%S")
-    volumes = yic_snapshot.get_volumes()
+    volumes = snapshot.get_volumes()
     for volume in volumes:
-      yic_snapshot.create_lvm_snapshot(snapshot_tag, volume)
+      snapshot.create_lvm_snapshot(snapshot_tag, volume)
     return 
   else:
     logit(funcname(), "No Snapshot")
